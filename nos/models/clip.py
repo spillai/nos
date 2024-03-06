@@ -22,6 +22,15 @@ class CLIPConfig(HuggingFaceHubConfig):
     """Width of the input image."""
 
 
+def auto_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    elif torch.backends.mps.is_available():
+        return "mps"
+    else:
+        return "cpu"
+
+
 class CLIP:
     """CLIP model for image and text encoding."""
 
@@ -56,11 +65,12 @@ class CLIP:
         except KeyError:
             raise ValueError(f"Invalid model_name: {model_name}, available models: {CLIP.configs.keys()}")
         model_name = self.cfg.model_name
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = auto_device()
         # TOFIX (spillai): Regression with fp16
         # https://github.com/autonomi-ai/nos/issues/198
         # torch_dtype = torch.float16 if self.device == "cuda" else torch.float32
-        torch_dtype = torch.float32
+        torch_dtype = torch.float32 if self.device == "cuda" else torch.float16
+        print(f"Initializing CLIP model (model_name={model_name}, device={self.device}, torch_dtype={torch_dtype})")
         self.model = CLIPModel.from_pretrained(model_name, torch_dtype=torch_dtype, torchscript=True).to(self.device)
         self.model.eval()
         self.tokenizer = CLIPTokenizer.from_pretrained(model_name)
